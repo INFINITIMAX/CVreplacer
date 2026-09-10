@@ -97,7 +97,12 @@ def mark_absent(conn: sqlite3.Connection, seen_urls: set[str], run_at: str) -> i
 
 
 def age_days(conn: sqlite3.Connection, url: str, now: str) -> float:
-    """Vechimea reala a anuntului, calculata din first_seen, in zile."""
+    """Vechimea reala a anuntului, calculata din first_seen, in zile.
+
+    Poate fi negativa daca `now` precede `first_seen`. Nu tratam cazul ca eroare:
+    e imposibil in fluxul normal, iar o exceptie ar ascunde o problema de ceas
+    in loc s-o arate.
+    """
     row = conn.execute("SELECT first_seen FROM jobs WHERE url = ?", (url,)).fetchone()
     if row is None:
         raise KeyError(f"url necunoscut in jobs: {url}")
