@@ -10,10 +10,56 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import UTC, datetime
+
+from cvreplacer import storage
+from cvreplacer.config import load_harvest_config
+from cvreplacer.sources import peviitor, queries
+
+_PROFILE_PATH = "data/cv/profile.json"
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def cmd_harvest(args: argparse.Namespace) -> int:
-    raise SystemExit("harvest: neimplementat inca (E3 din plan.md)")
+    # sursa manual e lipita din interfata (E7), nu din aceasta comanda -
+    # harvest recolteaza automat doar din peViitor.
+    del args
+
+    config = load_harvest_config()
+    profile = queries.load_profile(_PROFILE_PATH)
+    terms = queries.build_queries(profile)
+
+    conn = storage.connect(config.db_path)
+    run_id = storage.start_run(conn)
+
+    result = peviitor.harvest(
+        terms,
+        rate_limit_s=config.rate_limit_s,
+        base_url=config.peviitor_base,
+        user_agent=config.user_agent,
+    )
+
+    run_at = _now_iso()
+    seen = storage.upsert_seen(conn, result.jobs, run_at)
+    dead = storage.mark_absent(conn, {job.url for job in result.jobs}, run_at)
+    storage.finish_run(
+        conn,
+        run_id,
+        n_harvested=result.n_raw,
+        notes=f"interogari={result.n_queries} esuate={result.n_failed}",
+    )
+
+    print(f"interogari: {result.n_queries}")
+    print(f"brut: {result.n_raw}")
+    print(f"unic: {result.n_unique}")
+    print(f"esuate: {result.n_failed}")
+    print(f"noi: {seen.new}")
+    print(f"reinviate: {seen.revived}")
+    print(f"marcate moarte: {dead}")
+    return 0
 
 
 def cmd_score(args: argparse.Namespace) -> int:
