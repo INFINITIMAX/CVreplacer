@@ -1,0 +1,38 @@
+[project]
+name = "cvreplacer"
+version = "0.1.0"
+description = "Potriveste anunturi de job cu CV-ul tau, local, si iti spune ce iti lipseste"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic",       # scoring cu iesire structurata
+    "httpx",           # cereri catre surse si pagini de anunt
+    "selectolax",      # extragere text din HTML, rapid
+    "fastapi",         # aplicatia locala
+    "uvicorn",         # server
+    "jinja2",          # sabloane HTML randate pe server
+    "python-dotenv",   # citeste .env
+    "pydantic",        # scheme si validare
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[project.scripts]
+cvreplacer = "cvreplacer.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

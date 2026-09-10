@@ -1,0 +1,83 @@
+# === DATE PERSONALE — cel mai important bloc din acest fisier ===
+# CV-ul, baza de date cu anunturi si cache-ul contin date personale si
+# continut preluat de la terti. Nimic din data/ nu are ce cauta in git.
+data/**
+!data/.gitkeep
+!data/cv/.gitkeep
+!data/cache/.gitkeep
+!data/exports/.gitkeep
+*.db
+*.sqlite
+*.sqlite3
+*.pdf
+*.docx
+
+# Mediu si secrete
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Medii virtuale
+.venv/
+venv/
+ENV/
+env/
+
+# Unelte
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Documente interne de lucru — raman local
+intent.md
+spec.md
+plan.md
+TASKS.md
+CLAUDE.md
+docs/
+
+# Referinte personale
+inspiratie/
+
+# Sistem si editoare
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+
+# Scratch local
+scratch/
+tmp/
