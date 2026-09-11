@@ -56,6 +56,30 @@ def load_company_cap_config() -> CompanyCapConfig:
     return CompanyCapConfig(max_per_company=int(os.environ.get("CVR_MAX_PER_COMPANY", "3")))
 
 
+@dataclass(frozen=True)
+class FetchConfig:
+    user_agent: str
+    timeout_s: float
+    rate_limit_s: float
+    concurrency: int
+    cache_dir: str
+    cache_ttl_days: int
+    max_description_chars: int
+
+
+def load_fetch_config() -> FetchConfig:
+    """Citeste variabilele necesare comenzii fetch (descarcarea descrierilor, E5)."""
+    return FetchConfig(
+        user_agent=_require("CVR_USER_AGENT"),
+        timeout_s=float(os.environ.get("CVR_FETCH_TIMEOUT_S", "20")),
+        rate_limit_s=float(os.environ.get("CVR_RATE_LIMIT_SECONDS", "1.0")),
+        concurrency=int(os.environ.get("CVR_FETCH_CONCURRENCY", "4")),
+        cache_dir=os.environ.get("CVR_CACHE_DIR", "data/cache"),
+        cache_ttl_days=int(os.environ.get("CVR_CACHE_TTL_DAYS", "14")),
+        max_description_chars=int(os.environ.get("CVR_MAX_DESCRIPTION_CHARS", "20000")),
+    )
+
+
 def _require(name: str) -> str:
     value = os.environ.get(name)
     if not value:

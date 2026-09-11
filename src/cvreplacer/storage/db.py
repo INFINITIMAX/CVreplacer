@@ -12,11 +12,55 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from cvreplacer.storage import schema
-from cvreplacer.storage.models import RawJob, SeenResult
+from cvreplacer.storage.models import JobRow, RawJob, SeenResult
 
 
 def _now_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+_JOB_FIELDS = tuple(JobRow.__dataclass_fields__)
+
+
+def _job_row(row: sqlite3.Row) -> JobRow:
+    # `.keys()` e obligatoriu aici: pe un sqlite3.Row, `k in row` cauta printre
+    # VALORI, nu printre nume de coloana, si ar intoarce False pentru fiecare
+    # camp. Verificat: r.keys() == ['a','b'] dar 'a' in r == False.
+    return JobRow(**{k: row[k] for k in row.keys() if k in _JOB_FIELDS})  # noqa: SIM118
+
+
+def list_active_jobs(conn: sqlite3.Connection, limit: int | None = None) -> list[JobRow]:
+    """Anunturile inca active, cele mai noi intai dupa first_seen.
+
+    Ordinea conteaza: cand exista un plafon, vrem anunturile proaspete, nu pe
+    cele vechi la care oricum nu mai poti aplica.
+    """
+    sql = "SELECT * FROM jobs WHERE status = 'active' ORDER BY first_seen DESC"
+    params: tuple[int, ...] = ()
+    if limit is not None:
+        sql += " LIMIT ?"
+        params = (limit,)
+    return [_job_row(r) for r in conn.execute(sql, params)]
+
+
+def save_fetch_result(
+    conn: sqlite3.Connection,
+    url: str,
+    *,
+    raw_text: str | None,
+    fetch_status: str,
+    fetched_at: str | None = None,
+) -> None:
+    """Scrie rezultatul descarcarii pentru un anunt.
+
+    Nu atinge first_seen, last_seen sau status: descarcarea spune ceva despre
+    pagina anuntului, nu despre prezenta lui in index.
+    """
+    conn.execute(
+        "UPDATE jobs SET raw_text = ?, fetch_status = ?, fetched_at = ? WHERE url = ?",
+        (raw_text, fetch_status, fetched_at or _now_iso(), url),
+    )
+    conn.commit()
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
