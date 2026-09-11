@@ -6,7 +6,8 @@ requires-python = ">=3.12"
 dependencies = [
     "anthropic",       # scoring cu iesire structurata
     "httpx",           # cereri catre surse si pagini de anunt
-    "selectolax",      # extragere text din HTML, rapid
+    "trafilatura",     # extragerea continutului principal, fara selectoare proprii
+    "selectolax",      # extragere text din HTML, rapid (rezerva cand trafilatura taie prea mult)
     "fastapi",         # aplicatia locala
     "uvicorn",         # server
     "jinja2",          # sabloane HTML randate pe server
