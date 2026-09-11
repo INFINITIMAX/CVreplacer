@@ -85,6 +85,20 @@ def _lower_bound(match: re.Match[str]) -> int:
     return min(int(g) for g in groups)
 
 
+# Intervalele se colapseaza la limita inferioara INAINTE de potrivire.
+#
+# Altfel un tipar simplu prinde jumatatea de sus a intervalului ca si cum ar fi
+# un numar de sine statator: pentru "3-5 ani experienta in Python", tiparul de
+# interval da corect 3, dar tiparul "N ani experienta" prinde separat "5 ani
+# experienta" si taie anuntul. Rezultatul e supra-taiere tacuta - exact ce nu
+# vrem de la acest filtru.
+_RANGE_RE = re.compile(r"(\d{1,2})\s*[-–]\s*(\d{1,2})")
+
+
+def _collapse_ranges(text: str) -> str:
+    return _RANGE_RE.sub(lambda m: m.group(1), text)
+
+
 def _is_ai_software_context(text: str, start: int, end: int) -> bool:
     window = text[max(0, start - _CONTEXT_WINDOW) : end + _CONTEXT_WINDOW]
     return any(keyword in window for keyword in _AI_SOFTWARE_KEYWORDS)
@@ -96,7 +110,7 @@ def has_clear_ai_software_overage(text: str, threshold: float) -> bool:
     Orice alt caz (fara mentiune de ani, domeniu generic sau de inginerie,
     ori sub prag) intoarce False - filtrul nu taie decat ce e clar.
     """
-    folded = fold(text)
+    folded = _collapse_ranges(fold(text))
     for pattern in _YEARS_PATTERNS:
         for match in pattern.finditer(folded):
             years = _lower_bound(match)
