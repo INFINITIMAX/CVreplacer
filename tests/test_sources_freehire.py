@@ -282,6 +282,35 @@ def test_non_json_200_body_counts_as_failed_query_and_run_continues():
     assert [j.url for j in result.jobs] == ["https://exemplu.test/ok"]
 
 
+@pytest.mark.parametrize("body", [[], "text", 42])
+def test_valid_json_that_is_not_an_object_counts_as_failed_query(body):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.params["q"] == "ciudat":
+            return httpx.Response(200, json=body)
+        return httpx.Response(
+            200, json={"data": [_doc("https://exemplu.test/ok")], "meta": {"total": 1}}
+        )
+
+    result = _harvest(["ciudat", "normal"], handler)
+
+    assert result.n_failed == 1
+    assert [j.url for j in result.jobs] == ["https://exemplu.test/ok"]
+
+
+def test_null_data_and_non_dict_items_are_skipped_not_fatal():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.params["q"] == "gol":
+            return httpx.Response(200, json={"data": None, "meta": {"total": 0}})
+        return httpx.Response(
+            200, json={"data": ["nu-e-dict", _doc("https://exemplu.test/ok")], "meta": {"total": 2}}
+        )
+
+    result = _harvest(["gol", "amestec"], handler)
+
+    assert result.n_failed == 0
+    assert [j.url for j in result.jobs] == ["https://exemplu.test/ok"]
+
+
 # --------------------------------------------------------------------------
 # unificare pe url
 # --------------------------------------------------------------------------

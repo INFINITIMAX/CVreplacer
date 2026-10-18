@@ -52,8 +52,10 @@ def search(
                 "offset": offset,
             },
         )
-        docs = payload.get("data", [])
+        docs = payload.get("data") or []
         for doc in docs:
+            if not isinstance(doc, dict):
+                continue
             job = raw_job_from_freehire_doc(doc, max_chars)
             if job is not None:
                 jobs.append(job)
