@@ -110,7 +110,9 @@ def harvest(
                     max_chars=max_chars,
                     rate_limit_s=rate_limit_s,
                 )
-            except httpx.HTTPError:
+            # ValueError: un 200 care nu e JSON (pagina de mentenanta) sau JSON
+            # de forma neasteptata - interogarea esueaza, rularea continua.
+            except (httpx.HTTPError, ValueError):
                 n_failed += 1
                 jobs = []
 
@@ -150,4 +152,8 @@ def _get_page_with_retry(client: httpx.Client, params: dict) -> dict:
 def _get_page(client: httpx.Client, params: dict) -> dict:
     response = client.get(_SEARCH_PATH, params=params)
     response.raise_for_status()
-    return response.json()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        # eroare de protocol, nu de tip: aceeasi clasa ca JSONDecodeError, prinsa in harvest
+        raise ValueError("raspuns freehire neasteptat: nu e obiect JSON")  # noqa: TRY004
+    return payload
