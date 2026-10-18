@@ -78,6 +78,8 @@ def upsert_seen(conn: sqlite3.Connection, jobs: Iterable[RawJob], run_at: str) -
     url nou: insert cu first_seen = last_seen = run_at.
     url existent: doar last_seen si missing_runs = 0. first_seen nu se atinge.
     url existent si mort: reinviat -> status = active, missing_runs = 0.
+    La insert, daca sursa a dat deja textul (raw_text), se scrie cu
+    fetch_status = 'source'; randurile existente nu isi primesc raw_text.
     """
     new = 0
     updated = 0
@@ -85,11 +87,13 @@ def upsert_seen(conn: sqlite3.Connection, jobs: Iterable[RawJob], run_at: str) -
     for job in jobs:
         row = conn.execute("SELECT status FROM jobs WHERE url = ?", (job.url,)).fetchone()
         if row is None:
+            has_text = job.raw_text is not None
             conn.execute(
                 """
                 INSERT INTO jobs (url, title, company, city, remote, source,
-                                   first_seen, last_seen, missing_runs, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'active')
+                                   first_seen, last_seen, missing_runs, status,
+                                   raw_text, fetch_status, fetched_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'active', ?, ?, ?)
                 """,
                 (
                     job.url,
@@ -100,6 +104,9 @@ def upsert_seen(conn: sqlite3.Connection, jobs: Iterable[RawJob], run_at: str) -
                     job.source,
                     run_at,
                     run_at,
+                    job.raw_text,
+                    "source" if has_text else None,
+                    run_at if has_text else None,
                 ),
             )
             new += 1
@@ -119,14 +126,24 @@ def upsert_seen(conn: sqlite3.Connection, jobs: Iterable[RawJob], run_at: str) -
     return SeenResult(new=new, updated=updated, revived=revived)
 
 
-def mark_absent(conn: sqlite3.Connection, seen_urls: set[str], run_at: str) -> int:
+def mark_absent(
+    conn: sqlite3.Connection,
+    seen_urls: set[str],
+    run_at: str,
+    sources: set[str] | None = None,
+) -> int:
     """Creste missing_runs pentru anunturile active absente din rularea curenta.
+
+    Daca `sources` e dat, se iau in considerare doar randurile cu source in set;
+    None inseamna toate sursele.
 
     run_at nu e scris nicaieri (nu exista o astfel de coloana pe jobs);
     e primit doar ca sa pastreze semnatura ceruta si consistenta cu upsert_seen.
     """
     del run_at
-    rows = conn.execute("SELECT url FROM jobs WHERE status = 'active'").fetchall()
+    rows = conn.execute("SELECT url, source FROM jobs WHERE status = 'active'").fetchall()
+    if sources is not None:
+        rows = [row for row in rows if row["source"] in sources]
     absent_urls = [row["url"] for row in rows if row["url"] not in seen_urls]
 
     dead_count = 0

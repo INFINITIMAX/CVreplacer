@@ -18,7 +18,7 @@ class RawJob:
     company: str
     city: str | None
     remote: str | None  # on-site | hybrid | remote
-    source: str  # peviitor | manual
+    source: str  # peviitor | freehire | manual
     raw_text: str | None = None
 
 

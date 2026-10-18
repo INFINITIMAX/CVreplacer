@@ -329,3 +329,120 @@ def test_mark_applied_twice_upserts_instead_of_duplicating(conn):
     rows = conn.execute("SELECT note FROM applications WHERE url = ?", (URL,)).fetchall()
     assert len(rows) == 1
     assert rows[0]["note"] == "a doua nota"
+
+
+# --------------------------------------------------------------------------
+# 7. E3F: text venit din sursa + mark_absent pe surse
+# --------------------------------------------------------------------------
+
+
+def test_upsert_new_job_with_raw_text_marks_fetch_status_source(conn):
+    upsert_seen(conn, [make_job(URL, source="freehire", raw_text="descrierea completa")], run_at=T1)
+
+    row = _job_row(conn, URL)
+    assert row["raw_text"] == "descrierea completa"
+    assert row["fetch_status"] == "source"
+    assert row["fetched_at"] == T1
+
+
+def test_upsert_new_job_without_raw_text_leaves_fetch_columns_null(conn):
+    upsert_seen(conn, [make_job(URL, raw_text=None)], run_at=T1)
+
+    row = _job_row(conn, URL)
+    assert row["raw_text"] is None
+    assert row["fetch_status"] is None
+    assert row["fetched_at"] is None
+
+
+def test_existing_job_seen_again_with_other_raw_text_keeps_text_and_status(conn):
+    upsert_seen(conn, [make_job(URL, source="freehire", raw_text="versiunea 1")], run_at=T1)
+    upsert_seen(conn, [make_job(URL, source="freehire", raw_text="versiunea 2")], run_at=T2)
+
+    row = _job_row(conn, URL)
+    assert row["raw_text"] == "versiunea 1"
+    assert row["fetch_status"] == "source"
+    assert row["fetched_at"] == T1
+    assert row["first_seen"] == T1
+    assert row["last_seen"] == T2
+
+
+def test_existing_job_without_text_does_not_get_text_from_later_run(conn):
+    # anunt intrat prin peviitor (fara text), regasit de freehire (cu text):
+    # randul existent nu se atinge, textul ramane de adus de fetch
+    upsert_seen(conn, [make_job(URL, source="peviitor")], run_at=T1)
+    upsert_seen(conn, [make_job(URL, source="freehire", raw_text="text nou")], run_at=T2)
+
+    row = _job_row(conn, URL)
+    assert row["raw_text"] is None
+    assert row["fetch_status"] is None
+    assert row["source"] == "peviitor"
+
+
+def test_dead_job_revived_with_raw_text_keeps_old_text_columns(conn):
+    upsert_seen(conn, [make_job(URL, source="freehire", raw_text="vechi")], run_at=T1)
+    mark_absent(conn, set(), run_at=T2)
+    mark_absent(conn, set(), run_at=T3)
+    upsert_seen(conn, [make_job(URL, source="freehire", raw_text="nou")], run_at=T4)
+
+    row = _job_row(conn, URL)
+    assert row["status"] == "active"
+    assert row["raw_text"] == "vechi"
+    assert row["fetched_at"] == T1
+
+
+def test_mark_absent_with_sources_ignores_other_sources_even_after_two_runs(conn):
+    upsert_seen(
+        conn,
+        [make_job(URL, source="freehire"), make_job(URL_B, source="peviitor")],
+        run_at=T1,
+    )
+
+    dead_1 = mark_absent(conn, set(), run_at=T2, sources={"freehire"})
+    assert dead_1 == 0
+    assert _job_row(conn, URL)["missing_runs"] == 1
+    assert _job_row(conn, URL_B)["missing_runs"] == 0
+
+    dead_2 = mark_absent(conn, set(), run_at=T3, sources={"freehire"})
+    assert dead_2 == 1
+    assert _job_row(conn, URL)["status"] == "dead"
+    assert _job_row(conn, URL_B)["status"] == "active"
+    assert _job_row(conn, URL_B)["missing_runs"] == 0
+
+
+def test_mark_absent_with_sources_still_spares_seen_urls_of_that_source(conn):
+    upsert_seen(
+        conn,
+        [make_job(URL, source="freehire"), make_job(URL_B, source="freehire")],
+        run_at=T1,
+    )
+
+    mark_absent(conn, {URL}, run_at=T2, sources={"freehire"})
+
+    assert _job_row(conn, URL)["missing_runs"] == 0
+    assert _job_row(conn, URL_B)["missing_runs"] == 1
+
+
+def test_mark_absent_with_empty_sources_touches_nothing(conn):
+    upsert_seen(conn, [make_job(URL, source="freehire")], run_at=T1)
+
+    mark_absent(conn, set(), run_at=T2, sources=set())
+    mark_absent(conn, set(), run_at=T3, sources=set())
+
+    row = _job_row(conn, URL)
+    assert row["missing_runs"] == 0
+    assert row["status"] == "active"
+
+
+def test_mark_absent_without_sources_covers_all_sources(conn):
+    upsert_seen(
+        conn,
+        [make_job(URL, source="freehire"), make_job(URL_B, source="peviitor")],
+        run_at=T1,
+    )
+
+    mark_absent(conn, set(), run_at=T2)
+    dead = mark_absent(conn, set(), run_at=T3)
+
+    assert dead == 2
+    assert _job_row(conn, URL)["status"] == "dead"
+    assert _job_row(conn, URL_B)["status"] == "dead"
