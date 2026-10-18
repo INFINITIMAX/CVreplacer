@@ -29,6 +29,24 @@ def load_harvest_config() -> HarvestConfig:
 
 
 @dataclass(frozen=True)
+class FreehireConfig:
+    base: str
+    country: str
+    posted_within_days: int
+    max_pages: int
+
+
+def load_freehire_config() -> FreehireConfig:
+    """Citeste variabilele sursei freehire. Eroare clara daca lipseste baza."""
+    return FreehireConfig(
+        base=_require("CVR_FREEHIRE_BASE"),
+        country=os.environ.get("CVR_FREEHIRE_COUNTRY", "ro"),
+        posted_within_days=int(os.environ.get("CVR_FREEHIRE_POSTED_WITHIN_DAYS", "30")),
+        max_pages=int(os.environ.get("CVR_FREEHIRE_MAX_PAGES", "3")),
+    )
+
+
+@dataclass(frozen=True)
 class LocationConfig:
     home_city: str
     accept_remote: bool
